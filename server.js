@@ -2,6 +2,7 @@ import express from "express";
 import axios from "axios";
 import cors from "cors";
 import dotenv from "dotenv";
+import mongoose from "mongoose";
 dotenv.config();
 
 const app = express();
@@ -11,7 +12,11 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const WP_BASE= process.env.WP_BASE_URL ;
 const API_KEY = process.env.WP_API_KEY;
-console.log("WP_BASE:", WP_BASE);
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB Connected"))
+  .catch(err => console.error("MongoDB Error:", err));
+  
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
