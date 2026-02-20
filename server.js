@@ -28,6 +28,42 @@ const callWordPress = async (endpoint, query = {}) => {
   });
 };
 
+app.get("/api/proxy-image", async (req, res) => {
+  try {
+    const imageUrl = req.query.url;
+
+    if (!imageUrl) {
+      return res.status(400).send("Missing image URL");
+    }
+
+    console.log("Fetching image:", imageUrl);
+
+    const response = await axios.get(imageUrl, {
+      responseType: "arraybuffer",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Accept":
+          "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        "Referer": "https://maltaweather.com/",
+        "Origin": "https://maltaweather.com",
+      },
+    });
+
+    res.set("Content-Type", response.headers["content-type"]);
+    res.send(response.data);
+  } catch (error) {
+    console.error(
+      "IMAGE PROXY ERROR:",
+      error.response?.status,
+      error.response?.data || error.message
+    );
+    res.status(500).send("Image fetch error");
+  }
+});
+
+
+
 /**
  * Generic Proxy Route
  */
@@ -48,29 +84,6 @@ app.get("/api/:endpoint", async (req, res) => {
   }
 });
 
-app.get("/api/proxy-image", async (req, res) => {
-  try {
-    const imageUrl = req.query.url;
-
-    if (!imageUrl) {
-      return res.status(400).send("Missing image URL");
-    }
-
-    const response = await axios.get(imageUrl, {
-      responseType: "arraybuffer",
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "image/*",
-      },
-    });
-
-    res.set("Content-Type", response.headers["content-type"]);
-    res.send(response.data);
-  } catch (error) {
-    console.error("Image proxy error:", error.message);
-    res.status(500).send("Image fetch error");
-  }
-});
 
 
 /**
