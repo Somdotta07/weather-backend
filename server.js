@@ -11,7 +11,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const WP_BASE= process.env.WP_BASE_URL ;
 const API_KEY = process.env.WP_API_KEY;
-
+console.log("WP_BASE:", WP_BASE);
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
@@ -47,6 +47,31 @@ app.get("/api/:endpoint", async (req, res) => {
     });
   }
 });
+
+app.get("/api/proxy-image", async (req, res) => {
+  try {
+    const imageUrl = req.query.url;
+
+    if (!imageUrl) {
+      return res.status(400).send("Missing image URL");
+    }
+
+    const response = await axios.get(imageUrl, {
+      responseType: "arraybuffer",
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "image/*",
+      },
+    });
+
+    res.set("Content-Type", response.headers["content-type"]);
+    res.send(response.data);
+  } catch (error) {
+    console.error("Image proxy error:", error.message);
+    res.status(500).send("Image fetch error");
+  }
+});
+
 
 /**
  * Health Check
