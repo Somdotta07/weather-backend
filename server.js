@@ -73,6 +73,7 @@ app.get("/api/proxy-image", async (req, res) => {
 app.use("/api/auth", authRoutes);
 app.get("/api/user/me", auth, (req, res) => {
   res.json({
+    name: req.user.name,
     email: req.user.email,
     plan: req.user.plan,
     subscriptionStatus: req.user.subscriptionStatus,
