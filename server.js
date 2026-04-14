@@ -5,6 +5,9 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import authRoutes from "./routes/auth.js";
 import auth from "./middleware/auth.js";
+import notificationSettingsRoutes from "./routes/notificationSettings.js";
+import { startDailyForecastJobs } from "./services/dailyForecastJob.js";
+import subscriptionRoutes from "./routes/subscription.js"
 
 dotenv.config();
 
@@ -15,7 +18,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const WP_BASE = process.env.WP_BASE_URL;
 const API_KEY = process.env.WP_API_KEY;
-
+startDailyForecastJobs();
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
@@ -71,17 +74,20 @@ app.get("/api/proxy-image", async (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/notification-settings", notificationSettingsRoutes);
 app.get("/api/user/me", auth, (req, res) => {
   res.json({
     name: req.user.name,
     email: req.user.email,
     plan: req.user.plan,
     subscriptionStatus: req.user.subscriptionStatus,
+    subscriptionExpiry: req.user.subscriptionExpiry,
+    subscriptionProvider: req.user.subscriptionProvider,
+    gfEntryId: req.user.gfEntryId,
   });
 });
-/**
- * Generic Proxy Route
- */
+app.use("/api/subscription", subscriptionRoutes);
+
 app.get("/api/:endpoint", async (req, res) => {
   try {
     const { endpoint } = req.params;
@@ -98,9 +104,7 @@ app.get("/api/:endpoint", async (req, res) => {
     });
   }
 });
-/**
- * Health Check
- */
+
 app.get("/", (req, res) => {
   res.json({ status: "Backend running" });
 });

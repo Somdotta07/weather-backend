@@ -17,15 +17,97 @@ const userSchema = new mongoose.Schema(
     },
     plan: {
       type: String,
-      enum: ["free", "standard", "premium", "Jellyfish"],
+      enum: ["free", "standard", "premium", "jellyfish"],
       default: "free",
     },
     subscriptionStatus: {
       type: String,
-      enum: ["inactive", "active", "expired", "canceled"],
+      enum: [
+        "inactive",
+        "pending",
+        "active",
+        "expired",
+        "canceled",
+        "payment_failed",
+      ],
       default: "inactive",
     },
-    subscriptionExpiry: Date,
+    subscriptionProvider: {
+      type: String,
+      enum: ["none", "stripe_gf"],
+      default: "none",
+    },
+
+    stripeCustomerId: {
+      type: String,
+      default: null,
+    },
+
+    stripePaymentIntentId: {
+      type: String,
+      default: null,
+    },
+
+    stripePaymentIntentStatus: {
+      type: String,
+      default: null,
+    },
+
+    gfEntryId: {
+      type: String,
+      default: null,
+    },
+
+    subscriptionStartedAt: {
+      type: Date,
+      default: null,
+    },
+
+    subscriptionExpiry: {
+      type: Date,
+      default: null,
+    },
+    subscriptionCancelledAt: {
+      type: Date,
+      default: null,
+    },
+
+    expoPushToken: {
+      type: String,
+      default: null,
+    },
+    pushPermissionGranted: {
+      type: Boolean,
+      default: false,
+    },
+    notificationCity: {
+      type: String,
+      default: null,
+    },
+    weatherAlerts: {
+      rain: {
+        type: Boolean,
+        default: false,
+      },
+      severe: {
+        type: Boolean,
+        default: false,
+      },
+      dailyForecast: {
+        type: Boolean,
+        default: false,
+      },
+    },
+    lastDailyForecastSent: {
+      morning: {
+        type: Date,
+        default: null,
+      },
+      evening: {
+        type: Date,
+        default: null,
+      },
+    },
   },
   { timestamps: true },
 );
