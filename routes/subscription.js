@@ -4,11 +4,37 @@ import axios from "axios";
 import Stripe from "stripe";
 import auth from "../middleware/auth.js";
 import User from "../model/User.js";
+import OAuth from "oauth-1.0a";
+import crypto from "crypto";
 
 dotenv.config();
 
 const router = express.Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const oauth = OAuth({
+  consumer: {
+    key: process.env.GF_CONSUMER_KEY,
+    secret: process.env.GF_CONSUMER_SECRET,
+  },
+  signature_method: "HMAC-SHA1",
+
+  hash_function(base_string, key) {
+    return crypto
+      .createHmac("sha1", key)
+      .update(base_string)
+      .digest("base64");
+  },
+});
+
+const requestData = {
+  url: process.env.GF_SUBMIT_URL,
+  method: "POST",
+};
+
+const headers = oauth.toHeader(
+  oauth.authorize(requestData)
+);
+
 
 const PLAN_CONFIG = {
   jellyfish: {
@@ -159,96 +185,28 @@ router.post("/verify-payment", auth, async (req, res) => {
   }
 });
 
-router.post("/submit-gravity-form", auth, async (req, res) => {
+
+
+router.post("/submit-gravity-form", async (req, res) => {
   try {
-    const {
-      paymentIntentId,
-      recaptchaToken,
-      phone,
-      extraFields = {},
-    } = req.body;
-
-    if (!paymentIntentId) {
-      return res.status(400).json({ error: "paymentIntentId is required" });
-    }
-
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-
-    if (paymentIntent.status !== "succeeded") {
-      return res.status(400).json({
-        error: "Payment not successful",
-        status: paymentIntent.status,
-      });
-    }
-
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const formPayload = {
-      input_1: user.name || "",
-      input_2: user.email || "",
-      input_3: phone || "",
-      input_4: user.plan,
-      input_5: paymentIntent.id,
-      ...extraFields,
+    const payload = {
+      representative_first: "John",
+      representative_last: "Fratz",
+      email: "sample@born.mt",
     };
 
-    if (recaptchaToken) {
-      formPayload.grecaptcha_response = recaptchaToken;
-    }
-
-    const basicAuth = Buffer.from(
-      `${process.env.GF_BASIC_AUTH_USERNAME}:${process.env.GF_BASIC_AUTH_PASSWORD}`
-    ).toString("base64");
-
-    const gfResponse = await axios.post(
+    const response = await axios.post(
       process.env.GF_SUBMIT_URL,
-      formPayload,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${basicAuth}`,
-        },
-      }
+      payload
     );
 
-    const gfData = gfResponse.data;
+    return res.json(response.data);
 
-    if (gfResponse.status >= 200 && gfResponse.status < 300) {
-      const expiry = new Date();
-      expiry.setMonth(expiry.getMonth() + 1);
-
-      user.subscriptionStatus = "active";
-      user.subscriptionStartedAt = new Date();
-      user.subscriptionExpiry = expiry;
-      user.gfEntryId = String(gfData?.entry_id || "");
-      user.stripePaymentIntentStatus = paymentIntent.status;
-      await user.save();
-
-      return res.json({
-        success: true,
-        message: "Payment succeeded and Gravity Form submitted",
-        gf: gfData,
-        user: {
-          plan: user.plan,
-          subscriptionStatus: user.subscriptionStatus,
-          subscriptionExpiry: user.subscriptionExpiry,
-          gfEntryId: user.gfEntryId,
-        },
-      });
-    }
-
-    return res.status(400).json({
-      error: "Gravity Forms submission failed",
-      gf: gfData,
-    });
   } catch (err) {
-    console.error("GF SUBMISSION ERROR:", err.response?.data || err.message);
-    return res.status(err.response?.status || 500).json({
-      error: "Failed to submit Gravity Form",
-      details: err.response?.data || null,
+    console.error(err.response?.data || err.message);
+
+    return res.status(500).json({
+      error: err.response?.data || err.message,
     });
   }
 });
