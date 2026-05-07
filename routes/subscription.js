@@ -187,7 +187,7 @@ router.post("/verify-payment", auth, async (req, res) => {
 
 
 
-router.post("/submit-gravity-form", async (req, res) => {
+router.post("/submit-gravity-form", auth, async (req, res) => {
   try {
     const payload = {
       representative_first: "John",
