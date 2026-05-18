@@ -213,27 +213,30 @@ router.post("/verify-payment", auth, async (req, res) => {
 
 router.post("/submit-gravity-form", auth, async (req, res) => {
   try {
-    const payload = {
-      representative_first: "John",
-      representative_last: "Fratz",
-      email: "sample@born.mt",
-    };
-
-    console.log("GF URL:", process.env.GF_SUBMIT_URL);
+    const payload = req.body;
 
     const response = await axios.post(
       process.env.GF_SUBMIT_URL,
-      payload
+      payload,
+      {
+        headers: {
+          "api-key": process.env.WP_API_KEY,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      }
     );
 
     return res.json(response.data);
 
   } catch (err) {
-    console.log("STATUS:", err.response?.status);
-    console.log("DATA:", err.response?.data);
-    console.log("MESSAGE:", err.message);
+    console.error(
+      "GF ERROR:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
 
-    return res.status(500).json({
+    return res.status(err.response?.status || 500).json({
       error: err.response?.data || err.message,
     });
   }
