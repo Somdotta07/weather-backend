@@ -239,7 +239,6 @@ router.post("/submit-gravity-form", auth, async (req, res) => {
     );
 
     return res.status(err.response?.status || 500).json({
-      console.error("GF ERROR:", err.response?.status, err.response?.data || err.message);
       error: err.response?.data || err.message,
     });
   }
