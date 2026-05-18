@@ -187,6 +187,30 @@ router.post("/verify-payment", auth, async (req, res) => {
 
 
 
+// router.post("/submit-gravity-form", auth, async (req, res) => {
+//   try {
+//     const payload = {
+//       representative_first: "John",
+//       representative_last: "Fratz",
+//       email: "sample@born.mt",
+//     };
+
+//     const response = await axios.post(
+//       process.env.GF_SUBMIT_URL,
+//       payload
+//     );
+
+//     return res.json(response.data);
+
+//   } catch (err) {
+//     console.error(err.response?.data || err.message);
+
+//     return res.status(500).json({
+//       error: err.response?.data || err.message,
+//     });
+//   }
+// });
+
 router.post("/submit-gravity-form", auth, async (req, res) => {
   try {
     const payload = {
@@ -194,6 +218,8 @@ router.post("/submit-gravity-form", auth, async (req, res) => {
       representative_last: "Fratz",
       email: "sample@born.mt",
     };
+
+    console.log("GF URL:", process.env.GF_SUBMIT_URL);
 
     const response = await axios.post(
       process.env.GF_SUBMIT_URL,
@@ -203,7 +229,9 @@ router.post("/submit-gravity-form", auth, async (req, res) => {
     return res.json(response.data);
 
   } catch (err) {
-    console.error(err.response?.data || err.message);
+    console.log("STATUS:", err.response?.status);
+    console.log("DATA:", err.response?.data);
+    console.log("MESSAGE:", err.message);
 
     return res.status(500).json({
       error: err.response?.data || err.message,
