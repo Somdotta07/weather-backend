@@ -147,7 +147,7 @@ router.post("/create-payment-intent", auth, async (req, res) => {
       success: true,
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
-      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+      // publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
     });
   } catch (err) {
     console.error("CREATE PAYMENT INTENT ERROR:", err.message);
@@ -172,44 +172,36 @@ router.post("/verify-payment", auth, async (req, res) => {
 
     user.stripePaymentIntentId = paymentIntent.id;
     user.stripePaymentIntentStatus = paymentIntent.status;
+
+    if (paymentIntent.status === "succeeded") {
+      const plan = paymentIntent.metadata.plan;
+
+      user.plan = plan;
+      user.subscriptionStatus = "active";
+      user.subscriptionProvider = "stripe_gf";
+      user.subscriptionStartedAt = new Date();
+
+      const expiry = new Date();
+      expiry.setMonth(expiry.getMonth() + 1);
+      user.subscriptionExpiry = expiry;
+    }
+
     await user.save();
 
     return res.json({
       success: true,
-      paymentIntentId: paymentIntent.id,
       status: paymentIntent.status,
+      user: {
+        plan: user.plan,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionExpiry: user.subscriptionExpiry,
+      },
     });
   } catch (err) {
     console.error("VERIFY PAYMENT ERROR:", err.message);
     return res.status(500).json({ error: "Failed to verify payment" });
   }
 });
-
-
-
-// router.post("/submit-gravity-form", auth, async (req, res) => {
-//   try {
-//     const payload = {
-//       representative_first: "John",
-//       representative_last: "Fratz",
-//       email: "sample@born.mt",
-//     };
-
-//     const response = await axios.post(
-//       process.env.GF_SUBMIT_URL,
-//       payload
-//     );
-
-//     return res.json(response.data);
-
-//   } catch (err) {
-//     console.error(err.response?.data || err.message);
-
-//     return res.status(500).json({
-//       error: err.response?.data || err.message,
-//     });
-//   }
-// });
 
 router.post("/submit-gravity-form", auth, async (req, res) => {
   try {
