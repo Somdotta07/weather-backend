@@ -1,6 +1,7 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import User from "../model/User.js";
 
 const router = express.Router();
@@ -118,6 +119,113 @@ router.post("/login", async (req, res) => {
     console.error("LOGIN ERROR:", err);
     return res.status(500).json({
       error: "Login failed. Please try again later.",
+    });
+  }
+});
+
+/* FORGOT PASSWORD */
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const email = req.body.email?.trim().toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({ error: "Please enter your email address." });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: "Please enter a valid email address." });
+    }
+
+    const user = await User.findOne({ email });
+
+    // Do not reveal whether account exists
+    if (!user) {
+      return res.json({
+        message: "If an account exists with this email, a reset link has been sent.",
+      });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    user.passwordResetToken = hashedToken;
+    user.passwordResetExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+    await user.save();
+
+    const resetUrl = `${process.env.FRONTEND_RESET_URL}?token=${rawToken}&email=${encodeURIComponent(email)}`;
+
+    console.log("PASSWORD RESET LINK:", resetUrl);
+
+    // Later send resetUrl by email here
+
+    return res.json({
+      message: "If an account exists with this email, a reset link has been sent.",
+      resetUrl: process.env.NODE_ENV !== "production" ? resetUrl : undefined,
+    });
+  } catch (err) {
+    console.error("FORGOT PASSWORD ERROR:", err);
+    return res.status(500).json({
+      error: "Password reset request failed. Please try again later.",
+    });
+  }
+});
+
+/* RESET PASSWORD */
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { token, email, newPassword } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required." });
+    }
+
+    if (!token) {
+      return res.status(400).json({ error: "Reset token is required." });
+    }
+
+    if (!newPassword) {
+      return res.status(400).json({ error: "Please enter a new password." });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        error: "Password must be at least 6 characters long.",
+      });
+    }
+
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    const user = await User.findOne({
+      email: email.trim().toLowerCase(),
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        error: "Reset link is invalid or expired. Please request a new one.",
+      });
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+
+    await user.save();
+
+    return res.json({
+      message: "Password reset successful. Please log in with your new password.",
+    });
+  } catch (err) {
+    console.error("RESET PASSWORD ERROR:", err);
+    return res.status(500).json({
+      error: "Password reset failed. Please try again later.",
     });
   }
 });
