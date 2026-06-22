@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import User from "../model/User.js";
+import { sendPasswordResetEmail } from "../services/mailService.js";
 
 const router = express.Router();
 
@@ -182,7 +183,8 @@ router.post("/forgot-password", async (req, res) => {
         "If an account exists with this email, a reset link has been sent.",
     });
   } catch (err) {
-    console.error("FORGOT PASSWORD ERROR:", err);
+    console.error("FORGOT PASSWORD ERROR FULL:", err);
+    console.error("MESSAGE:", err?.message);
     return res.status(500).json({
       error: "Password reset request failed. Please try again later.",
     });
