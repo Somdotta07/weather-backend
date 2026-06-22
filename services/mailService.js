@@ -1,9 +1,17 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import nodemailer from "nodemailer";
+
+console.log("SMTP HOST:", process.env.BREVO_SMTP_HOST);
+console.log("SMTP USER:", process.env.BREVO_SMTP_USER);
+console.log("MAIL FROM:", process.env.MAIL_FROM);
 
 const transporter = nodemailer.createTransport({
   host: process.env.BREVO_SMTP_HOST,
   port: Number(process.env.BREVO_SMTP_PORT || 587),
   secure: false,
+  requireTLS: true,
   auth: {
     user: process.env.BREVO_SMTP_USER,
     pass: process.env.BREVO_SMTP_PASS,
