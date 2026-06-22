@@ -22,11 +22,15 @@ router.post("/register", async (req, res) => {
     }
 
     if (!email) {
-      return res.status(400).json({ error: "Please enter your email address." });
+      return res
+        .status(400)
+        .json({ error: "Please enter your email address." });
     }
 
     if (!isValidEmail(email)) {
-      return res.status(400).json({ error: "Please enter a valid email address." });
+      return res
+        .status(400)
+        .json({ error: "Please enter a valid email address." });
     }
 
     if (!password) {
@@ -43,7 +47,8 @@ router.post("/register", async (req, res) => {
 
     if (existingUser) {
       return res.status(409).json({
-        error: "An account already exists with this email. Please log in instead.",
+        error:
+          "An account already exists with this email. Please log in instead.",
       });
     }
 
@@ -73,11 +78,15 @@ router.post("/login", async (req, res) => {
     const password = req.body.password;
 
     if (!email) {
-      return res.status(400).json({ error: "Please enter your email address." });
+      return res
+        .status(400)
+        .json({ error: "Please enter your email address." });
     }
 
     if (!isValidEmail(email)) {
-      return res.status(400).json({ error: "Please enter a valid email address." });
+      return res
+        .status(400)
+        .json({ error: "Please enter a valid email address." });
     }
 
     if (!password) {
@@ -88,7 +97,8 @@ router.post("/login", async (req, res) => {
 
     if (!user) {
       return res.status(404).json({
-        error: "No account found with this email. Please check your email or create an account.",
+        error:
+          "No account found with this email. Please check your email or create an account.",
       });
     }
 
@@ -103,7 +113,8 @@ router.post("/login", async (req, res) => {
     if (!process.env.JWT_SECRET) {
       console.error("JWT_SECRET is missing");
       return res.status(500).json({
-        error: "Login service is temporarily unavailable. Please try again later.",
+        error:
+          "Login service is temporarily unavailable. Please try again later.",
       });
     }
 
@@ -129,11 +140,15 @@ router.post("/forgot-password", async (req, res) => {
     const email = req.body.email?.trim().toLowerCase();
 
     if (!email) {
-      return res.status(400).json({ error: "Please enter your email address." });
+      return res
+        .status(400)
+        .json({ error: "Please enter your email address." });
     }
 
     if (!isValidEmail(email)) {
-      return res.status(400).json({ error: "Please enter a valid email address." });
+      return res
+        .status(400)
+        .json({ error: "Please enter a valid email address." });
     }
 
     const user = await User.findOne({ email });
@@ -141,7 +156,8 @@ router.post("/forgot-password", async (req, res) => {
     // Do not reveal whether account exists
     if (!user) {
       return res.json({
-        message: "If an account exists with this email, a reset link has been sent.",
+        message:
+          "If an account exists with this email, a reset link has been sent.",
       });
     }
 
@@ -156,14 +172,14 @@ router.post("/forgot-password", async (req, res) => {
     await user.save();
 
     const resetUrl = `${process.env.FRONTEND_RESET_URL}?token=${rawToken}&email=${encodeURIComponent(email)}`;
-
-    console.log("PASSWORD RESET LINK:", resetUrl);
-
-    // Later send resetUrl by email here
+    await sendPasswordResetEmail({
+      to: email,
+      resetUrl,
+    });
 
     return res.json({
-      message: "If an account exists with this email, a reset link has been sent.",
-      resetUrl: process.env.NODE_ENV !== "production" ? resetUrl : undefined,
+      message:
+        "If an account exists with this email, a reset link has been sent.",
     });
   } catch (err) {
     console.error("FORGOT PASSWORD ERROR:", err);
@@ -196,10 +212,7 @@ router.post("/reset-password", async (req, res) => {
       });
     }
 
-    const hashedToken = crypto
-      .createHash("sha256")
-      .update(token)
-      .digest("hex");
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
     const user = await User.findOne({
       email: email.trim().toLowerCase(),
@@ -220,7 +233,8 @@ router.post("/reset-password", async (req, res) => {
     await user.save();
 
     return res.json({
-      message: "Password reset successful. Please log in with your new password.",
+      message:
+        "Password reset successful. Please log in with your new password.",
     });
   } catch (err) {
     console.error("RESET PASSWORD ERROR:", err);
