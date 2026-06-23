@@ -158,7 +158,7 @@ router.post("/forgot-password", async (req, res) => {
     if (!user) {
       return res.json({
         message:
-          "If an account exists with this email, a reset link has been sent.",
+          "Email is not registered. Please enter a valid email address or create an account.",
       });
     }
 
@@ -173,14 +173,15 @@ router.post("/forgot-password", async (req, res) => {
     await user.save();
 
     const resetUrl = `${process.env.FRONTEND_RESET_URL}?token=${rawToken}&email=${encodeURIComponent(email)}`;
-    await sendPasswordResetEmail({
-      to: email,
-      resetUrl,
-    });
+    // await sendPasswordResetEmail({
+    //   to: email,
+    //   resetUrl,
+    // });
 
     return res.json({
       message:
-        "If an account exists with this email, a reset link has been sent.",
+        "Reset link generated. Please create a new password.",
+        resetUrl, // Include the reset URL in the response for testing purposes
     });
   } catch (err) {
     console.error("FORGOT PASSWORD ERROR FULL:", err);
