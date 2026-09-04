@@ -120,4 +120,15 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+userSchema.methods.isSubscriptionActive = function () {
+  if (this.plan === "free") return false;
+  if (this.subscriptionStatus !== "active") return false;
+  if (!this.subscriptionExpiry) return false;
+  return new Date(this.subscriptionExpiry).getTime() > Date.now();
+};
+
+userSchema.methods.effectivePlan = function () {
+  return this.isSubscriptionActive() ? this.plan : "free";
+};
+
 export default mongoose.model("User", userSchema);

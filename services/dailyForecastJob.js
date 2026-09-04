@@ -44,7 +44,11 @@ function buildMorningForecastMessage(current) {
     .map((item) => parseTemperature(item.temperature));
 
   const avgTemp = Math.round(average(temps));
-  const description = block1?.description || block2?.description || current?.description || "Weather update";
+  const description =
+    block1?.description ||
+    block2?.description ||
+    current?.description ||
+    "Weather update";
 
   return `Today's forecast: ${description}, around ${avgTemp}° on average this morning.`;
 }
@@ -60,7 +64,11 @@ function buildEveningForecastMessage(current) {
     .map((item) => parseTemperature(item.temperature));
 
   const avgTemp = Math.round(average(temps));
-  const description = block1?.description || block2?.description || current?.description || "Weather update";
+  const description =
+    block1?.description ||
+    block2?.description ||
+    current?.description ||
+    "Weather update";
 
   return `This evening's forecast: ${description}, around ${avgTemp}° on average later today.`;
 }
@@ -71,6 +79,8 @@ async function sendDailyForecastBatch(period) {
     pushPermissionGranted: true,
     expoPushToken: { $ne: null },
     notificationCity: { $ne: null },
+    subscriptionStatus: "active",
+    subscriptionExpiry: { $gt: new Date() },
   });
 
   for (const user of users) {
@@ -108,7 +118,7 @@ async function sendDailyForecastBatch(period) {
     } catch (err) {
       console.error(
         `DAILY FORECAST SEND ERROR for user ${user._id}:`,
-        err.response?.data || err.message
+        err.response?.data || err.message,
       );
     }
   }

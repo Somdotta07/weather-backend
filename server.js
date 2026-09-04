@@ -5,9 +5,11 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import authRoutes from "./routes/auth.js";
 import auth from "./middleware/auth.js";
+import requirePlan from "./middleware/requirePlan.js";
 import notificationSettingsRoutes from "./routes/notificationSettings.js";
 import { startDailyForecastJobs } from "./services/dailyForecastJob.js";
-import subscriptionRoutes from "./routes/subscription.js"
+import { startExpireSubscriptionsJob } from "./services/expireSubscriptionsJob.js";
+import subscriptionRoutes from "./routes/subscription.js";
 
 dotenv.config();
 
@@ -18,7 +20,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const WP_BASE = process.env.WP_BASE_URL;
 const API_KEY = process.env.WP_API_KEY;
-startDailyForecastJobs();
+
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
@@ -27,7 +29,8 @@ mongoose
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
+startDailyForecastJobs();
+startExpireSubscriptionsJob();
 /* Call to WP API */
 const callWordPress = async (endpoint, query = {}) => {
   return axios.get(`${WP_BASE}/maltaweather/v1/${endpoint}`, {
@@ -48,7 +51,10 @@ app.get("/api/proxy-image", async (req, res) => {
       return res.status(400).send("Missing image URL");
     }
 
-    console.log("Fetching image:", imageUrl);
+    const url = new URL(imageUrl);
+    if (url.hostname !== "maltaweather.com") {
+      return res.status(400).send("Invalid image host");
+    }
 
     const response = await axios.get(imageUrl, {
       responseType: "arraybuffer",
@@ -76,19 +82,22 @@ app.get("/api/proxy-image", async (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/notification-settings", notificationSettingsRoutes);
 app.get("/api/user/me", auth, (req, res) => {
+  const u = req.user;
   res.json({
-    name: req.user.name,
-    email: req.user.email,
-    plan: req.user.plan,
-    subscriptionStatus: req.user.subscriptionStatus,
-    subscriptionExpiry: req.user.subscriptionExpiry,
-    subscriptionProvider: req.user.subscriptionProvider,
-    gfEntryId: req.user.gfEntryId,
+    name: u.name,
+    email: u.email,
+    plan: u.plan,
+    effectivePlan: u.effectivePlan(),
+    isSubscriptionActive: u.isSubscriptionActive(),
+    subscriptionStatus: u.subscriptionStatus,
+    subscriptionExpiry: u.subscriptionExpiry,
+    subscriptionProvider: u.subscriptionProvider,
+    gfEntryId: u.gfEntryId,
   });
 });
 app.use("/api/subscription", subscriptionRoutes);
 
-app.get("/api/:endpoint", async (req, res) => {
+app.get("/api/:endpoint", requirePlan, async (req, res) => {
   try {
     const { endpoint } = req.params;
     const queryParams = req.query;
@@ -97,11 +106,13 @@ app.get("/api/:endpoint", async (req, res) => {
 
     res.json(response.data);
   } catch (error) {
-    console.error("WP ERROR:", error.response?.data || error.message);
-
-    res.status(error.response?.status || 500).json({
-      error: "Failed to fetch data",
-    });
+    console.error(
+      "WP ERROR:",
+      req.params.endpoint,
+      error.response?.status,
+      error.response?.data || error.message,
+    );
+    res.status(502).json({ error: "Failed to fetch data" });
   }
 });
 

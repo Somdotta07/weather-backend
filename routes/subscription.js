@@ -206,9 +206,6 @@ router.post("/verify-payment", auth, async (req, res) => {
 router.post("/submit-gravity-form", auth, async (req, res) => {
   try {
     const payload = req.body;
-    console.log("GF URL:", process.env.GF_SUBMIT_URL);
-    console.log("API KEY:", process.env.WP_API_KEY);
-
     const response = await axios.post(
       process.env.GF_SUBMIT_URL,
       payload,
