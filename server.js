@@ -97,7 +97,7 @@ app.get("/api/user/me", auth, (req, res) => {
 });
 app.use("/api/subscription", subscriptionRoutes);
 
-app.get("/api/:endpoint", requirePlan, async (req, res) => {
+app.get("/api/:endpoint",auth, requirePlan, async (req, res) => {
   try {
     const { endpoint } = req.params;
     const queryParams = req.query;
