@@ -95,6 +95,15 @@ app.get("/api/user/me", auth, (req, res) => {
     gfEntryId: u.gfEntryId,
   });
 });
+app.delete("/api/user/me", auth, async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.user._id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("DELETE USER ERROR:", err.message);
+    return res.status(500).json({ error: "Failed to delete account" });
+  }
+});
 app.use("/api/subscription", subscriptionRoutes);
 
 app.get("/api/:endpoint",auth, requirePlan, async (req, res) => {
