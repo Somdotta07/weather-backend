@@ -10,6 +10,7 @@ import notificationSettingsRoutes from "./routes/notificationSettings.js";
 import { startDailyForecastJobs } from "./services/dailyForecastJob.js";
 import { startExpireSubscriptionsJob } from "./services/expireSubscriptionsJob.js";
 import subscriptionRoutes from "./routes/subscription.js";
+import User from "./model/User.js";
 
 dotenv.config();
 
