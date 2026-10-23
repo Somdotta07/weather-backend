@@ -6,7 +6,34 @@ dotenv.config();
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+/**
+ * Publishable key matching STRIPE_SECRET_KEY. Sent to the app with every
+ * payment so the app always uses the same Stripe account/mode as this
+ * server - switching test <-> live only needs this .env, not a new build.
+ */
+export const STRIPE_PUBLISHABLE_KEY = (() => {
+  const pk = process.env.STRIPE_PUBLISHABLE_KEY || "";
+  return pk.startsWith("pk_") ? pk : null;
+})();
 
+(() => {
+  const sk = process.env.STRIPE_SECRET_KEY || "";
+  const secretMode = sk.includes("_live_") ? "live" : sk.includes("_test_") ? "test" : "?";
+  const pk = STRIPE_PUBLISHABLE_KEY || "";
+  const pkMode = pk.includes("_live_") ? "live" : pk.includes("_test_") ? "test" : "missing";
+  console.log(`Stripe: secret key ${secretMode}, publishable key ${pkMode}`);
+  if (pkMode !== "missing" && secretMode !== pkMode) {
+    console.warn("Stripe WARNING: STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY are different modes");
+  }
+})();
+
+/* ------------------------------------------------------------------ */
+/* Premium subscription offer                                          */
+/*                                                                     */
+/* Premium = all features. Auto-renews monthly or every 12 months.     */
+/* 7-day free trial, card required up front. Jellyfish / Standard stay */
+/* one-off monthly passes (routes/subscription.js PLAN_CONFIG).        */
+/* ------------------------------------------------------------------ */
 export const TRIAL_DAYS = 7;
 
 export const FULL_ACCESS_PLANS = {
@@ -32,7 +59,14 @@ export const VALID_INTERVALS = Object.keys(FULL_ACCESS_PLANS);
 
 const PRODUCT_NAME = "Malta Weather - Premium";
 
-
+/* ------------------------------------------------------------------ */
+/* Price lookup                                                        */
+/*                                                                     */
+/* Uses STRIPE_PRICE_FULL_MONTHLY / STRIPE_PRICE_FULL_YEARLY if set.   */
+/* Otherwise finds the price by lookup_key and, if it doesn't exist in */
+/* this Stripe account yet, creates it once. Works the same in test    */
+/* and live mode without manual dashboard setup.                       */
+/* ------------------------------------------------------------------ */
 const priceCache = new Map();
 
 async function findOrCreateProduct() {
@@ -109,14 +143,22 @@ export function subscriptionHasPaymentMethod(sub) {
   return !!sub?.default_payment_method;
 }
 
-
+/**
+ * Copy a Stripe subscription onto the user document. Single source of
+ * truth for access: called from the app's confirm call AND from webhooks,
+ * so whichever arrives first wins and the other is a no-op.
+ *
+ * Does not save - caller saves.
+ */
 export function applySubscriptionToUser(user, sub) {
   const status = sub.status;
   const item = sub.items?.data?.[0];
   const periodEnd = toDate(item?.current_period_end);
   const hasCard = subscriptionHasPaymentMethod(sub);
 
-
+  // A subscription the user abandoned before entering a card (status
+  // "incomplete", or "trialing" with no card saved) must never grant access
+  // or overwrite an active one-time pass.
   const grantsAccess =
     status === "active" || (status === "trialing" && hasCard);
 

@@ -79,12 +79,10 @@ app.get("/api/proxy-image", async (req, res) => {
     res.set("Content-Type", response.headers["content-type"]);
     res.send(response.data);
   } catch (error) {
-    console.error(
-      "IMAGE PROXY ERROR:",
-      error.response?.status,
-      error.response?.data || error.message,
-    );
-    res.status(500).send("Image fetch error");
+    const status = error.response?.status;
+    // Log which image failed - not the whole HTML error page
+    console.error("IMAGE PROXY ERROR:", status || error.message, req.query.url);
+    res.status(status === 404 ? 404 : 502).send("Image fetch error");
   }
 });
 

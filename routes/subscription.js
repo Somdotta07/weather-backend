@@ -5,6 +5,7 @@ import auth from "../middleware/auth.js";
 import User from "../model/User.js";
 import {
   stripe,
+  STRIPE_PUBLISHABLE_KEY,
   TRIAL_DAYS,
   FULL_ACCESS_PLANS,
   VALID_INTERVALS,
@@ -197,6 +198,7 @@ router.post("/create-payment-intent", auth, async (req, res) => {
     return res.json({
       success: true,
       clientSecret: paymentIntent.client_secret,
+      publishableKey: STRIPE_PUBLISHABLE_KEY,
       paymentIntentId: paymentIntent.id,
     });
   } catch (err) {
@@ -399,6 +401,7 @@ router.post("/start", auth, async (req, res) => {
         success: true,
         intentType: "setup",
         clientSecret: setupIntent.client_secret,
+        publishableKey: STRIPE_PUBLISHABLE_KEY,
         setupIntentId: setupIntent.id,
         subscriptionId: sub.id,
         freeTrial: freeTrial,
@@ -432,6 +435,7 @@ router.post("/start", auth, async (req, res) => {
       success: true,
       intentType: "payment",
       clientSecret,
+      publishableKey: STRIPE_PUBLISHABLE_KEY,
       subscriptionId: sub.id,
       freeTrial: false,
       firstChargeAt: new Date(now),
@@ -598,6 +602,7 @@ router.post("/retry-payment", auth, async (req, res) => {
       success: true,
       intentType: "payment",
       clientSecret,
+      publishableKey: STRIPE_PUBLISHABLE_KEY,
       subscriptionId: sub.id,
       amount: invoice.amount_due,
       currency: invoice.currency,
