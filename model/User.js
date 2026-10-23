@@ -42,8 +42,42 @@ const userSchema = new mongoose.Schema(
     },
     subscriptionProvider: {
       type: String,
-      enum: ["none", "stripe_gf"],
+      enum: ["none", "stripe_gf", "stripe_subscription"],
       default: "none",
+    },
+
+    /* --- Recurring full-access subscription (Stripe Billing) --- */
+    stripeSubscriptionId: {
+      type: String,
+      default: null,
+    },
+    // Created by /subscription/start but card/payment not completed yet.
+    pendingStripeSubscriptionId: {
+      type: String,
+      default: null,
+    },
+    // Raw Stripe status: trialing | active | past_due | canceled | ...
+    stripeSubscriptionStatus: {
+      type: String,
+      default: null,
+    },
+    billingInterval: {
+      type: String,
+      enum: ["monthly", "yearly", null],
+      default: null,
+    },
+    cancelAtPeriodEnd: {
+      type: Boolean,
+      default: false,
+    },
+    trialEndsAt: {
+      type: Date,
+      default: null,
+    },
+    // Set once the user has started a free trial with a card - one trial per account.
+    trialUsedAt: {
+      type: Date,
+      default: null,
     },
 
     stripeCustomerId: {
@@ -120,11 +154,37 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// Auto-renewing subscriptions get a short grace window past the period
+// end, so a renewal webhook arriving a few minutes late doesn't lock a
+// paying user out. One-time passes end exactly at expiry.
+export const RENEWAL_GRACE_MS = 24 * 60 * 60 * 1000;
+
+userSchema.methods.accessUntil = function () {
+  if (!this.subscriptionExpiry) return null;
+  const end = new Date(this.subscriptionExpiry).getTime();
+  const renewing =
+    this.subscriptionProvider === "stripe_subscription" &&
+    !this.cancelAtPeriodEnd;
+  return new Date(renewing ? end + RENEWAL_GRACE_MS : end);
+};
+
 userSchema.methods.isSubscriptionActive = function () {
   if (this.plan === "free") return false;
   if (this.subscriptionStatus !== "active") return false;
-  if (!this.subscriptionExpiry) return false;
-  return new Date(this.subscriptionExpiry).getTime() > Date.now();
+  const until = this.accessUntil();
+  if (!until) return false;
+  return until.getTime() > Date.now();
+};
+
+userSchema.methods.hasLiveRecurringSubscription = function () {
+  return (
+    this.subscriptionProvider === "stripe_subscription" &&
+    ["trialing", "active", "past_due"].includes(this.stripeSubscriptionStatus)
+  );
+};
+
+userSchema.methods.isTrialEligible = function () {
+  return !this.trialUsedAt;
 };
 
 userSchema.methods.effectivePlan = function () {

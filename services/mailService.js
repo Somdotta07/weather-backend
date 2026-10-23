@@ -38,3 +38,43 @@ export async function sendPasswordResetEmail({ to, resetUrl }) {
     `,
   });
 }
+const formatMoney = (amount, currency) =>
+  new Intl.NumberFormat("en-MT", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(amount / 100);
+
+export async function sendTrialEndingEmail({
+  to,
+  name,
+  trialEnd,
+  amount,
+  currency,
+  interval,
+}) {
+  const date = trialEnd.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const price = `${formatMoney(amount, currency)} ${interval === "year" ? "every 12 months" : "per month"}`;
+
+  return transporter.sendMail({
+    from: process.env.MAIL_FROM,
+    to,
+    subject: "Your Malta Weather free trial ends soon",
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+        <h2>Your free trial ends on ${date}</h2>
+        <p>Hi ${name || "there"},</p>
+        <p>Thanks for trying Malta Weather Premium. Your free trial ends on
+        <strong>${date}</strong>. After that your subscription continues at
+        <strong>${price}</strong>, charged to the card you added, and renews
+        automatically until you cancel.</p>
+        <p>Don't want to continue? Open the app, go to
+        <strong>Settings &rarr; Subscription</strong> and tap
+        <strong>Cancel Premium</strong> before ${date}. You won't be charged.</p>
+      </div>
+    `,
+  });
+}

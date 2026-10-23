@@ -10,12 +10,20 @@ import notificationSettingsRoutes from "./routes/notificationSettings.js";
 import { startDailyForecastJobs } from "./services/dailyForecastJob.js";
 import { startExpireSubscriptionsJob } from "./services/expireSubscriptionsJob.js";
 import subscriptionRoutes from "./routes/subscription.js";
+import stripeWebhook from "./routes/stripeWebhook.js";
 import User from "./model/User.js";
+import { stripe, subscriptionSummary } from "./services/billingService.js";
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
+// Stripe webhook needs the raw body for signature checks - register before express.json()
+app.post(
+  "/api/subscription/webhook",
+  express.raw({ type: "application/json" }),
+  stripeWebhook,
+);
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
@@ -94,10 +102,25 @@ app.get("/api/user/me", auth, (req, res) => {
     subscriptionExpiry: u.subscriptionExpiry,
     subscriptionProvider: u.subscriptionProvider,
     gfEntryId: u.gfEntryId,
+    ...subscriptionSummary(u),
   });
 });
 app.delete("/api/user/me", auth, async (req, res) => {
   try {
+    // Stop any auto-renewing subscription first, so a deleted account is
+    // never charged again. If Stripe can't be reached, don't delete.
+    const u = req.user;
+    const subIds = [u.stripeSubscriptionId, u.pendingStripeSubscriptionId].filter(Boolean);
+    for (const id of new Set(subIds)) {
+      const sub = await stripe.subscriptions.retrieve(id).catch((e) => {
+        if (e.code === "resource_missing") return null;
+        throw e;
+      });
+      if (sub && !["canceled", "incomplete_expired"].includes(sub.status)) {
+        await stripe.subscriptions.cancel(id);
+      }
+    }
+
     await User.findByIdAndDelete(req.user._id);
     return res.json({ success: true });
   } catch (err) {
