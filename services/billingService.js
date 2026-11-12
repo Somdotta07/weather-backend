@@ -258,8 +258,37 @@ export async function syncSubscriptionById(subscriptionId) {
   return { sub, user };
 }
 
+/**
+ * Returns a Stripe customer for this user in the CURRENT Stripe mode.
+ *
+ * A customer ID saved while the server ran on test keys doesn't exist in
+ * live mode (and vice versa). In that case the stale Stripe data from the
+ * other mode is cleared and a fresh customer is created.
+ */
 export async function ensureStripeCustomer(user) {
-  if (user.stripeCustomerId) return user.stripeCustomerId;
+  if (user.stripeCustomerId) {
+    try {
+      const existing = await stripe.customers.retrieve(user.stripeCustomerId);
+      if (!existing.deleted) return existing.id;
+    } catch (err) {
+      if (err.code !== "resource_missing") throw err;
+    }
+    console.warn(
+      `Stripe customer ${user.stripeCustomerId} not found in this mode - creating a new one for user ${user._id}`,
+    );
+    user.stripeCustomerId = null;
+    user.stripePaymentIntentId = null;
+    user.stripePaymentIntentStatus = null;
+    user.pendingStripeSubscriptionId = null;
+    if (user.subscriptionProvider === "stripe_subscription") {
+      // That subscription lived in the other mode - it no longer exists here.
+      user.stripeSubscriptionId = null;
+      user.stripeSubscriptionStatus = null;
+      user.cancelAtPeriodEnd = false;
+      user.trialEndsAt = null;
+      user.subscriptionStatus = "expired";
+    }
+  }
   const customer = await stripe.customers.create({
     email: user.email,
     name: user.name,
@@ -271,18 +300,36 @@ export async function ensureStripeCustomer(user) {
 }
 
 export function subscriptionSummary(user) {
+  // Stripe subscription (Android). Android's screens only use the fields
+  // below when hasRecurringSubscription is true, so Apple subscribers show
+  // there like a running pass.
   const hasRecurring = user.hasLiveRecurringSubscription();
+  // Apple auto-renewing Premium (iPhone)
+  const hasApple = user.hasLiveAppleSubscription();
+  const hasAny = hasRecurring || hasApple;
+  const trialRunning =
+    !!user.trialEndsAt &&
+    new Date(user.trialEndsAt).getTime() > Date.now() &&
+    user.isSubscriptionActive();
+
   return {
     trialEligible: user.isTrialEligible(),
     trialDays: TRIAL_DAYS,
     trialEndsAt: user.trialEndsAt,
-    isTrialing:
-      hasRecurring &&
-      user.stripeSubscriptionStatus === "trialing" &&
-      user.isSubscriptionActive(),
-    billingInterval: hasRecurring ? user.billingInterval : null,
+    isTrialing: hasRecurring
+      ? user.stripeSubscriptionStatus === "trialing" && user.isSubscriptionActive()
+      : hasApple && trialRunning,
+    billingInterval: hasAny ? user.billingInterval : null,
     hasRecurringSubscription: hasRecurring,
-    cancelAtPeriodEnd: hasRecurring ? !!user.cancelAtPeriodEnd : false,
-    autoRenews: hasRecurring && !user.cancelAtPeriodEnd,
+    hasAppleSubscription: hasApple,
+    subscriptionStore:
+      user.subscriptionProvider === "apple"
+        ? "apple"
+        : user.subscriptionProvider?.startsWith("stripe")
+          ? "stripe"
+          : null,
+    appleAccountToken: user.appleAccountToken || null,
+    cancelAtPeriodEnd: hasAny ? !!user.cancelAtPeriodEnd : false,
+    autoRenews: hasAny && !user.cancelAtPeriodEnd,
   };
 }

@@ -42,7 +42,7 @@ const userSchema = new mongoose.Schema(
     },
     subscriptionProvider: {
       type: String,
-      enum: ["none", "stripe_gf", "stripe_subscription"],
+      enum: ["none", "stripe_gf", "stripe_subscription", "apple"],
       default: "none",
     },
 
@@ -74,6 +74,31 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    /* --- Apple In-App Purchase (iPhone) --- */
+    // Random UUID sent with every Apple purchase, so a purchase can only be
+    // credited to the account that made it.
+    appleAccountToken: {
+      type: String,
+      default: null,
+    },
+    appleOriginalTransactionId: {
+      type: String,
+      default: null,
+    },
+    appleProductId: {
+      type: String,
+      default: null,
+    },
+    appleEnvironment: {
+      type: String,
+      default: null,
+    },
+    // Apple one-month passes already credited (so Restore can't extend them)
+    appleTransactionIds: {
+      type: [String],
+      default: [],
+    },
+
     // Set once the user has started a free trial with a card - one trial per account.
     trialUsedAt: {
       type: Date,
@@ -162,9 +187,10 @@ export const RENEWAL_GRACE_MS = 24 * 60 * 60 * 1000;
 userSchema.methods.accessUntil = function () {
   if (!this.subscriptionExpiry) return null;
   const end = new Date(this.subscriptionExpiry).getTime();
-  const renewing =
-    this.subscriptionProvider === "stripe_subscription" &&
-    !this.cancelAtPeriodEnd;
+  const autoRenewable =
+    this.subscriptionProvider === "stripe_subscription" ||
+    (this.subscriptionProvider === "apple" && !!this.billingInterval);
+  const renewing = autoRenewable && !this.cancelAtPeriodEnd;
   return new Date(renewing ? end + RENEWAL_GRACE_MS : end);
 };
 
@@ -181,6 +207,13 @@ userSchema.methods.hasLiveRecurringSubscription = function () {
     this.subscriptionProvider === "stripe_subscription" &&
     ["trialing", "active", "past_due"].includes(this.stripeSubscriptionStatus)
   );
+};
+
+/** Apple auto-renewing Premium (bought on iPhone) that is still running. */
+userSchema.methods.hasLiveAppleSubscription = function () {
+  if (this.subscriptionProvider !== "apple" || !this.billingInterval) return false;
+  if (this.subscriptionStatus === "payment_failed") return true;
+  return this.isSubscriptionActive();
 };
 
 userSchema.methods.isTrialEligible = function () {

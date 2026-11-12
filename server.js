@@ -11,6 +11,8 @@ import { startDailyForecastJobs } from "./services/dailyForecastJob.js";
 import { startExpireSubscriptionsJob } from "./services/expireSubscriptionsJob.js";
 import subscriptionRoutes from "./routes/subscription.js";
 import stripeWebhook from "./routes/stripeWebhook.js";
+import appleSubscriptionRoutes from "./routes/appleSubscription.js";
+import { randomUUID } from "crypto";
 import User from "./model/User.js";
 import { stripe, subscriptionSummary } from "./services/billingService.js";
 
@@ -88,8 +90,13 @@ app.get("/api/proxy-image", async (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/notification-settings", notificationSettingsRoutes);
-app.get("/api/user/me", auth, (req, res) => {
+app.get("/api/user/me", auth, async (req, res) => {
   const u = req.user;
+  // Token the iPhone app attaches to Apple purchases (see routes/appleSubscription.js)
+  if (!u.appleAccountToken) {
+    u.appleAccountToken = randomUUID();
+    await u.save().catch((e) => console.error("appleAccountToken save failed:", e.message));
+  }
   res.json({
     name: u.name,
     email: u.email,
@@ -126,6 +133,7 @@ app.delete("/api/user/me", auth, async (req, res) => {
     return res.status(500).json({ error: "Failed to delete account" });
   }
 });
+app.use("/api/subscription/apple", appleSubscriptionRoutes);
 app.use("/api/subscription", subscriptionRoutes);
 
 app.get("/api/:endpoint",auth, requirePlan, async (req, res) => {

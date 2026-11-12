@@ -164,17 +164,7 @@ router.post("/create-payment-intent", auth, async (req, res) => {
       });
     }
 
-    let customerId = user.stripeCustomerId;
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: user.name,
-        metadata: { userId: String(user._id) },
-      });
-      customerId = customer.id;
-      user.stripeCustomerId = customerId;
-    }
+    const customerId = await ensureStripeCustomer(user);
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: PLAN_CONFIG[plan].amount,
@@ -326,7 +316,11 @@ router.post("/start", auth, async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    if (user.hasLiveRecurringSubscription()) {
+    // Also clears Stripe data left over from test mode (see ensureStripeCustomer)
+    const customerId = await ensureStripeCustomer(user);
+
+    // Already subscribed here, or to Premium through Apple on an iPhone
+    if (user.hasLiveRecurringSubscription() || user.hasLiveAppleSubscription()) {
       return res.status(409).json({ error: "already_subscribed" });
     }
 
@@ -350,7 +344,6 @@ router.post("/start", auth, async (req, res) => {
       user.pendingStripeSubscriptionId = null;
     }
 
-    const customerId = await ensureStripeCustomer(user);
     const priceId = await getPriceId(interval);
     const cfg = FULL_ACCESS_PLANS[interval];
 
